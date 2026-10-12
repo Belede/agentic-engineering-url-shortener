@@ -50,9 +50,9 @@ Add `SHORTENER_DEFAULT_TTL_DAYS` (default 90, validated ≤ 365) to `src/shorten
 
 Every transition in this scenario (`QUALITY_CHECK → CLARIFY`, the human's `clarify` call, `RENORMALIZE`, `DECOMPOSE → DESIGN → ARCH_APPROVAL → SECURITY_APPROVAL → IMPLEMENT → TEST → DOCUMENT`) is recorded in `state_transitions` and `audit_events`, queryable via `GET /api/v1/workflows/{run_id}`.
 
-## Terminal Outcome (at time of writing)
+## Terminal Outcome
 
-Parked at `RELEASE_APPROVAL` — intentionally. Release readiness for this scenario is decided together with Greenfield and Brownfield at the combined final release-readiness gate (Phase 5), not fabricated per-scenario.
+Reached `RELEASE_APPROVAL` and was decided together with Greenfield and Brownfield at the combined final release-readiness gate (Phase 5): **READY WITH ACCEPTED LIMITATIONS**, confirmed by the human candidate, 2026-10-12 (`docs/governance/decision-log.md` entry #19).
 
 ## Reviewer Verification
 

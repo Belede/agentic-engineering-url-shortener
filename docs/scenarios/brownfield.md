@@ -37,7 +37,7 @@ Full analysis performed against the real repository state — see `docs/scenario
 
 ## Release
 
-Contract bumped `1.1.0 → 1.2.0` (additive, backward-compatible).
+Contract bumped `1.1.0 → 1.2.0` (additive, backward-compatible). Reached `RELEASE_APPROVAL`, decided together with Greenfield and Ambiguous at the combined final release-readiness gate: **READY WITH ACCEPTED LIMITATIONS**, confirmed by the human candidate, 2026-10-12 (`docs/governance/decision-log.md` entry #19).
 
 ## Reviewer Verification
 

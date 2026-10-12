@@ -91,4 +91,6 @@ All assumptions in `spec.md`'s "Assumptions" section remain valid and unchanged,
 - One MEDIUM finding, disclosed and accepted rather than blocking. 
 - Greenfield scenario reached `DONE`; Brownfield and Ambiguous scenario runs are intentionally parked at `RELEASE_APPROVAL`, each pending its own real human release decision.
 
-**Computed recommendation**: **READY WITH ACCEPTED LIMITATIONS** — pending the human candidate's actual `RELEASE_APPROVAL` decision for the Brownfield and Ambiguous orchestration runs and the overall project's final release-readiness sign-off (Phase 5, next and final step). This report does not itself constitute that decision.
+**Computed recommendation**: **READY WITH ACCEPTED LIMITATIONS**.
+
+**Confirmed human decision** (2026-10-12, recorded in `docs/governance/decision-log.md` entry #19): the human candidate (Belede Rahul) reviewed this recommendation and the Final Independent Assessment and confirmed **READY WITH ACCEPTED LIMITATIONS** as the final release-readiness decision for all three scenario runs and the overall project. Tagged as `assessment-submission-v1.0`.
