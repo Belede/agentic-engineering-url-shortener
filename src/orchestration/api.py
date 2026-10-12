@@ -253,3 +253,44 @@ def get_workflow(run_id: str, conn: sqlite3.Connection = Depends(get_db)) -> Wor
         decisions=decisions,
         approvals=approvals,
     )
+
+
+class ResumeRequest(BaseModel):
+    to_state: str
+    decided_by: str
+    rationale: str
+
+
+@router.post("/api/v1/workflows/{run_id}/resume", response_model=WorkflowStateResponse)
+def resume(
+    run_id: str,
+    body: ResumeRequest,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> WorkflowStateResponse:
+    """T031: explicit human resume from SAFE_STOP (FR-024). Only re-enters
+    at a node the graph actually permits (SAFE_STOP -> DESIGN/IMPLEMENT/TEST,
+    all actor='human') — an invalid target is rejected like any other
+    undeclared transition, not silently allowed."""
+    run = _require_run(conn, run_id)
+    if run["current_state"] != "SAFE_STOP":
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run is at {run['current_state']!r}, not SAFE_STOP",
+        )
+
+    conn.execute(
+        "INSERT INTO audit_events (run_id, actor_type, action, affected_artifact, result, reason) "
+        "VALUES (?, 'human', 'resume', ?, 'success', ?)",
+        (run_id, f"workflow_runs:{run_id}", body.rationale),
+    )
+    conn.commit()
+
+    try:
+        transition(conn, run_id, to_state=body.to_state, actor="human", reason=body.rationale)
+    except InvalidTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    run = get_run(conn, run_id)
+    return WorkflowStateResponse(
+        run_id=run_id, current_state=run["current_state"], scenario_type=run["scenario_type"]
+    )
