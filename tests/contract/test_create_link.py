@@ -32,9 +32,21 @@ def test_create_returns_201_with_code_and_short_url(client):
     assert body["target_url"] == "https://example.com"
 
 
-def test_create_with_no_expiry_fields_is_permanent(client):
-    """CL-07: no default expiry."""
+def test_create_with_no_fields_gets_the_default_ttl(client):
+    """CL-07's original 'no default expiry' baseline was superseded by CL-03's
+    resolution (ambiguous scenario, docs/scenarios/ambiguous.md): new links
+    now get a default TTL (90 days) unless the caller opts out."""
     resp = client.post("/api/v1/links", json={"target_url": "https://example.com"}, headers=auth())
+    assert resp.json()["expires_at"] is not None
+
+
+def test_create_with_no_expiry_true_remains_permanent(client):
+    """The explicit opt-out (CL-03 resolution) — still achievable, just no
+    longer the unconditional default."""
+    resp = client.post(
+        "/api/v1/links", json={"target_url": "https://example.com", "no_expiry": True},
+        headers=auth(),
+    )
     assert resp.json()["expires_at"] is None
 
 

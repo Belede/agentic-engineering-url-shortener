@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from shortener.api.deps import get_db
 from shortener.api.rate_limit import enforce_rate_limit
+from shortener.config import get_settings
 from shortener.domain.shortcode import CodeSpaceExhaustedError, generate_unique_code
 from shortener.domain.validation import InvalidUrlError, SsrfBlockedError, validate_target_url
 from shortener.persistence import idempotency_repository, links_repository
@@ -19,6 +20,7 @@ class CreateLinkRequest(BaseModel):
     expires_at: str | None = None
     ttl_seconds: int | None = Field(default=None, gt=0)
     max_clicks: int | None = Field(default=None, gt=0)
+    no_expiry: bool = False  # CL-03 resolution: opt out of the default TTL
 
 
 class LinkResponse(BaseModel):
@@ -28,15 +30,21 @@ class LinkResponse(BaseModel):
     expires_at: str | None
 
 
-def _resolve_expires_at(body: CreateLinkRequest) -> str | None:
-    """CL-07: no default expiry — permanent unless caller sets one."""
+def _resolve_expires_at(body: CreateLinkRequest, default_ttl_days: int) -> str | None:
+    """CL-07 baseline (no default expiry) was superseded by CL-03's resolution
+    (ambiguous scenario, docs/scenarios/ambiguous.md): NEW links get a
+    default TTL unless the caller sets their own expires_at/ttl_seconds or
+    passes no_expiry=true. Already-existing links are never retroactively
+    affected — this function only ever runs at creation time."""
     if body.expires_at:
         return body.expires_at
     if body.ttl_seconds:
         return (
             datetime.now(UTC) + timedelta(seconds=body.ttl_seconds)
         ).isoformat()
-    return None
+    if body.no_expiry:
+        return None
+    return (datetime.now(UTC) + timedelta(days=default_ttl_days)).isoformat()
 
 
 @router.post("/api/v1/links", status_code=201, response_model=LinkResponse)
@@ -61,7 +69,7 @@ def create_link(
     except (InvalidUrlError, SsrfBlockedError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    expires_at = _resolve_expires_at(body)
+    expires_at = _resolve_expires_at(body, default_ttl_days=get_settings().default_ttl_days)
 
     try:
         code = generate_unique_code(
@@ -91,6 +99,7 @@ class BatchItem(BaseModel):
     expires_at: str | None = None
     ttl_seconds: int | None = Field(default=None, gt=0)
     max_clicks: int | None = Field(default=None, gt=0)
+    no_expiry: bool = False
 
 
 class CreateBatchRequest(BaseModel):
@@ -136,7 +145,11 @@ def create_batch(
             continue
 
         expires_at = _resolve_expires_at(
-            CreateLinkRequest(target_url=item.target_url, expires_at=item.expires_at, ttl_seconds=item.ttl_seconds)
+            CreateLinkRequest(
+                target_url=item.target_url, expires_at=item.expires_at,
+                ttl_seconds=item.ttl_seconds, no_expiry=item.no_expiry,
+            ),
+            default_ttl_days=get_settings().default_ttl_days,
         )
         try:
             code = generate_unique_code(exists=lambda c: links_repository.code_exists(conn, c))

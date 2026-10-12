@@ -12,7 +12,7 @@ Versioned alongside `contracts/openapi.yaml`. Schema version tracks the SQLite m
 | `target_url` | TEXT | NOT NULL | validated scheme + SSRF-blocked (NFR-001, CL-05) |
 | `created_by` | TEXT | NOT NULL, FK→`api_keys.key_id` | attribution only (CL-06) |
 | `created_at` | TEXT (ISO8601) | NOT NULL | |
-| `expires_at` | TEXT (ISO8601) | NULLABLE | null = permanent (CL-07) |
+| `expires_at` | TEXT (ISO8601) | NULLABLE | null = permanent. CL-07's "no default expiry" baseline was superseded by CL-03's resolution (ambiguous scenario, v1.3.0): new links now default to `SHORTENER_DEFAULT_TTL_DAYS` (90 days) unless `no_expiry=true` or an explicit `expires_at`/`ttl_seconds` is given — existing links already in the database are never retroactively affected, since this default is applied only at creation time. |
 | `max_clicks` | INTEGER | NULLABLE | added by migration 0002 (CL-02, brownfield) |
 | `click_count` | INTEGER | NOT NULL DEFAULT 0 | atomically incremented on redirect when `max_clicks` is set |
 | `status` | TEXT | NOT NULL DEFAULT 'active' | `active` \| `exhausted` |

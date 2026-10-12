@@ -1,13 +1,16 @@
 openapi: 3.0.3
 info:
   title: Agentic URL Shortener API
-  version: 1.2.0
+  version: 1.3.0
   description: >
-    v1.2.0 (additive): adds optional max_clicks on link creation and a
-    LINK_EXHAUSTED 410 outcome on redirect, approved and implemented under
-    the Brownfield scenario (docs/scenarios/brownfield.md, CL-02). No
-    breaking change from v1.1.0 — existing links are unaffected (max_clicks
-    defaults to unlimited).
+    v1.3.0: resolves the ambiguous expiry requirement (docs/scenarios/ambiguous.md,
+    CL-03). NEW links now get a default 90-day TTL (SHORTENER_DEFAULT_TTL_DAYS)
+    unless the caller sets expires_at/ttl_seconds or passes no_expiry=true.
+    This SUPERSEDES the earlier CL-07 "no default expiry" baseline for new
+    links only — already-existing links are never retroactively affected,
+    resolving the original contradiction (expire vs. must-never-break).
+    Caller-visible change: a caller relying on the old permanent-by-default
+    behavior must now pass no_expiry=true explicitly.
     See specs/001-agentic-url-shortener/data-model.md for schema details.
 servers:
   - url: http://localhost:8000
@@ -42,6 +45,12 @@ components:
           minimum: 1
           nullable: true
           description: optional redirect limit; omitted/null means unlimited (CL-02, added v1.2.0)
+        no_expiry:
+          type: boolean
+          default: false
+          description: >
+            Opt out of the default 90-day TTL (CL-03, added v1.3.0). Ignored
+            if expires_at or ttl_seconds is also set (those take precedence).
     LinkResponse:
       type: object
       properties:

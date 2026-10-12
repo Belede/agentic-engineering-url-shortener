@@ -20,4 +20,8 @@ Append-only record of every explicit human decision made by the candidate (Beled
 | 14 | 2026-10-12 | Human Gate 4 (ADRs) | All 11 ADRs accepted as proposed |
 | 15 | 2026-10-12 | Pre-code gate | Task plan (52 tasks) and independent review's 4 conditions approved; implementation authorized to begin |
 
-Subsequent entries will record: the ambiguous-scenario clarification answer (within-run, also logged in `approval_records`), and the final release-readiness decision.
+| 16 | 2026-10-12 | Ambiguous scenario (CL-03) — CLARIFY answer | "New links only" — new links get a default expiry; already-shared links never retroactively affected |
+| 17 | 2026-10-12 | Ambiguous scenario — ARCH_APPROVAL | Approved: `SHORTENER_DEFAULT_TTL_DAYS` (default 90, max 365), new-links-only, `no_expiry` opt-out |
+| 18 | 2026-10-12 | Ambiguous scenario — SECURITY_APPROVAL | Approved: config.py change validated (bounded TTL, no secret exposure) |
+
+Subsequent entries will record: the final combined release-readiness decision for all three scenarios (Phase 5).
