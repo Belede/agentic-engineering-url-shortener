@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from orchestration.api import router as orchestration_router
 from shortener.api.health import router as health_router
 from shortener.api.links import router as links_router
 from shortener.api.redirect import router as redirect_router
@@ -29,6 +30,7 @@ def create_app(db_path: str | None = None) -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(links_router)
+    app.include_router(orchestration_router)
     app.include_router(redirect_router)  # catch-all /{code} must be registered last
 
     @app.exception_handler(sqlite3.OperationalError)
