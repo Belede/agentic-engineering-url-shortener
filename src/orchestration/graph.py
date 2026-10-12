@@ -50,6 +50,11 @@ TRANSITIONS: tuple[tuple[str, str, str], ...] = (
 
     ("IMPLEMENT", "TEST", "system"),
     ("IMPLEMENT", "ROLLBACK", "system"),  # reversible implementation failure
+    # Late ambiguity (fault-injection variant, spec.md Scenario A): a
+    # material gap discovered mid-implementation suspends to the same
+    # human-gated CLARIFY node as early ambiguity, reusing RENORMALIZE for
+    # scoped resumption rather than a second, parallel mechanism.
+    ("IMPLEMENT", "CLARIFY", "system"),
 
     # TEST fans out internally (unit/contract/security sub-groups) and fans
     # back in here; a retry-exhausted transient failure safe-stops.
