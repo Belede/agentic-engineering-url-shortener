@@ -1,11 +1,13 @@
 openapi: 3.0.3
 info:
   title: Agentic URL Shortener API
-  version: 1.1.0
+  version: 1.2.0
   description: >
-    v1.1.0 (additive): adds POST /api/v1/links/batch, approved and implemented
-    under the Greenfield scenario (docs/scenarios/greenfield.md, CL-01). No
-    breaking change from v1.0.0 — all prior endpoints are unchanged.
+    v1.2.0 (additive): adds optional max_clicks on link creation and a
+    LINK_EXHAUSTED 410 outcome on redirect, approved and implemented under
+    the Brownfield scenario (docs/scenarios/brownfield.md, CL-02). No
+    breaking change from v1.1.0 — existing links are unaffected (max_clicks
+    defaults to unlimited).
     See specs/001-agentic-url-shortener/data-model.md for schema details.
 servers:
   - url: http://localhost:8000
@@ -35,6 +37,11 @@ components:
           minimum: 1
           nullable: true
           description: mutually exclusive with expires_at
+        max_clicks:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: optional redirect limit; omitted/null means unlimited (CL-02, added v1.2.0)
     LinkResponse:
       type: object
       properties:
@@ -168,7 +175,10 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
         "410":
-          description: expired link (FR-005)
+          description: >
+            Expired (error=LINK_EXPIRED semantics, FR-005) or exhausted
+            (error=LINK_EXHAUSTED, CL-02, added v1.2.0) — distinguished by
+            the response body's error field.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }

@@ -18,6 +18,7 @@ class CreateLinkRequest(BaseModel):
     target_url: str
     expires_at: str | None = None
     ttl_seconds: int | None = Field(default=None, gt=0)
+    max_clicks: int | None = Field(default=None, gt=0)
 
 
 class LinkResponse(BaseModel):
@@ -72,6 +73,7 @@ def create_link(
             target_url=body.target_url,
             created_by=api_key,
             expires_at=expires_at,
+            max_clicks=body.max_clicks,
         )
     except CodeSpaceExhaustedError as exc:
         raise HTTPException(status_code=503, detail="CODE_SPACE_EXHAUSTED") from exc
@@ -88,6 +90,7 @@ class BatchItem(BaseModel):
     target_url: str
     expires_at: str | None = None
     ttl_seconds: int | None = Field(default=None, gt=0)
+    max_clicks: int | None = Field(default=None, gt=0)
 
 
 class CreateBatchRequest(BaseModel):
@@ -139,6 +142,7 @@ def create_batch(
             code = generate_unique_code(exists=lambda c: links_repository.code_exists(conn, c))
             link = links_repository.create_link(
                 conn, code=code, target_url=item.target_url, created_by=api_key, expires_at=expires_at,
+                max_clicks=item.max_clicks,
             )
         except CodeSpaceExhaustedError:
             results.append(BatchItemResult(

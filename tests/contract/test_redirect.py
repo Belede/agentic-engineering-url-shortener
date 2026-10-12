@@ -39,6 +39,17 @@ def test_redirect_to_unknown_code_returns_404(client_and_conn):
     assert resp.status_code == 404
 
 
+def test_error_responses_match_documented_error_response_shape(client_and_conn):
+    """Contract fidelity: {"error": ..., "message": ...} at top level, not
+    FastAPI's default {"detail": ...} wrapper, matching contracts/openapi.yaml."""
+    client, _ = client_and_conn
+    resp = client.get("/no-such-code", follow_redirects=False)
+    assert resp.status_code == 404
+    body = resp.json()
+    assert "error" in body and "message" in body
+    assert body["error"] == "NOT_FOUND"
+
+
 def test_redirect_to_expired_code_returns_410(client_and_conn):
     client, _ = client_and_conn
     past = (datetime.now(UTC) - timedelta(days=1)).isoformat()

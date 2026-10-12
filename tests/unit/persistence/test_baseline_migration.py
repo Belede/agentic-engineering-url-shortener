@@ -33,14 +33,19 @@ def test_0001_creates_all_baseline_tables(conn):
     assert EXPECTED_TABLES.issubset(table_names)
 
 
-def test_0001_up_down_up_cycle(conn):
+def test_full_migration_chain_up_down_up_cycle(conn):
+    """Rolls every applied migration all the way back (not just the last
+    one — this directory now holds 0001 and 0002, so a full-chain teardown
+    is the correct regression check), then reapplies everything."""
     runner = MigrationRunner(conn, MIGRATIONS_DIR)
     runner.apply_all()
-    runner.rollback_last()
-    tables_after_down = {
+    while runner.current_version() is not None:
+        runner.rollback_last()
+    tables_after_full_teardown = {
         r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
     }
-    assert "short_links" not in tables_after_down
+    assert "short_links" not in tables_after_full_teardown
+
     runner.apply_all()
     tables_after_up_again = {
         r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
