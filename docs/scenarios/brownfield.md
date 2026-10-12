@@ -33,6 +33,7 @@ Full analysis performed against the real repository state — see `docs/scenario
 - Migration up/down/up with existing-row preservation.
 - **Regression**: links without `max_clicks` behave exactly as before (`test_link_without_max_clicks_is_unaffected_regression`) — all pre-existing `test_redirect.py` and `test_analytics_concurrency.py` tests pass unmodified.
 - **Concurrency** (the impact analysis's named risk, directly addressed): 20 parallel requests against a `max_clicks=5` link yield exactly 5 successes and 15 `LINK_EXHAUSTED` — verified, not assumed (`test_concurrent_redirects_never_exceed_max_clicks`).
+- **Orchestration run** (added during `/speckit-converge` — see `docs/assessment/post-implementation-analysis.md`): `test_brownfield_change_runs_through_impact_analysis_gated_orchestration` drives this change through the real engine end-to-end, referencing the committed impact-analysis artifact at the `DESIGN` step, with a real human `ARCH_APPROVAL`, through to `TEST`/`DOCUMENT`, parked at `RELEASE_APPROVAL`.
 
 ## Release
 
@@ -43,4 +44,4 @@ Contract bumped `1.1.0 → 1.2.0` (additive, backward-compatible).
 ```bash
 pytest tests/e2e/test_scenario_brownfield.py -v
 ```
-Expected: 5 passed, including the concurrency test. Inspect commit `06524b2` to confirm the impact analysis predates commit containing migration 0002.
+Expected: 6 passed, including the concurrency test and the full orchestration-run trace. Inspect commit `06524b2` to confirm the impact analysis predates commit containing migration 0002.

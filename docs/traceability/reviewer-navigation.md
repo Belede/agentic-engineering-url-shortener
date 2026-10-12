@@ -76,7 +76,7 @@ Test: `tests/orchestration/test_arch_approval_gate.py`.
 
 ## 13. Brownfield Scenario
 
-`docs/scenarios/brownfield-impact-analysis.md` (impact analysis, committed before any code — verify: `git log --oneline -- docs/scenarios/brownfield-impact-analysis.md src/shortener/migrations/0002_max_clicks.sql` shows the analysis commit `06524b2` precedes the migration commit `392ad44`) + `docs/scenarios/brownfield.md` + `tests/e2e/test_scenario_brownfield.py` → 5 passed, including the concurrency test.
+`docs/scenarios/brownfield-impact-analysis.md` (impact analysis, committed before any code — verify: `git log --oneline -- docs/scenarios/brownfield-impact-analysis.md src/shortener/migrations/0002_max_clicks.sql` shows the analysis commit `06524b2` precedes the migration commit `392ad44`) + `docs/scenarios/brownfield.md` + `tests/e2e/test_scenario_brownfield.py` → 6 passed, including the concurrency test and the full impact-analysis-gated orchestration-run trace.
 
 ## 14. Ambiguous-Requirement Scenario
 
