@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS audit_events;
+DROP TABLE IF EXISTS policy_evaluations;
+DROP TABLE IF EXISTS policy_exceptions;
+DROP TABLE IF EXISTS approval_records;
+DROP TABLE IF EXISTS decisions;
+DROP TABLE IF EXISTS state_transitions;
+DROP TABLE IF EXISTS workflow_runs;
+DROP TABLE IF EXISTS idempotency_keys;
+DROP TABLE IF EXISTS redirect_events;
+DROP TABLE IF EXISTS short_links;
+DROP TABLE IF EXISTS api_keys;
