@@ -24,6 +24,21 @@ class ClarifyRequest(BaseModel):
     rationale: str
 
 
+class ApproveRequest(BaseModel):
+    gate: str  # "ARCH_APPROVAL" | "SECURITY_APPROVAL" | "RELEASE_APPROVAL"
+    decision: str  # "approved" | "rejected"
+    decided_by: str
+    rationale: str
+
+
+# For each (gate, decision) pair that is NOT RELEASE_APPROVAL (handled
+# separately in T026 — it has a three-way READY/LIMITATIONS/NOT_READY
+# outcome rather than a plain approve/reject), the target state when
+# approved may depend on run state (security_sensitive) — handled in code
+# below rather than this static table for ARCH_APPROVAL's branch.
+REJECT_TARGET = "SAFE_STOP"
+
+
 class WorkflowStateResponse(BaseModel):
     run_id: str
     current_state: str
@@ -64,6 +79,49 @@ def clarify(
 
     try:
         transition(conn, run_id, to_state="RENORMALIZE", actor="human", reason=body.rationale)
+    except InvalidTransitionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    run = get_run(conn, run_id)
+    return WorkflowStateResponse(
+        run_id=run_id, current_state=run["current_state"], scenario_type=run["scenario_type"]
+    )
+
+
+@router.post("/api/v1/workflows/{run_id}/approve", response_model=WorkflowStateResponse)
+def approve(
+    run_id: str,
+    body: ApproveRequest,
+    conn: sqlite3.Connection = Depends(get_db),
+) -> WorkflowStateResponse:
+    """Handles ARCH_APPROVAL and SECURITY_APPROVAL (T021/T022). RELEASE_APPROVAL
+    has its own endpoint (T026) since it carries a three-way outcome, not a
+    plain approve/reject."""
+    run = _require_run(conn, run_id)
+    if run["current_state"] != body.gate:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run is at {run['current_state']!r}, not {body.gate!r}",
+        )
+    if body.gate not in ("ARCH_APPROVAL", "SECURITY_APPROVAL"):
+        raise HTTPException(status_code=400, detail=f"Unsupported gate for this endpoint: {body.gate!r}")
+
+    conn.execute(
+        "INSERT INTO approval_records (run_id, gate, decision, decided_by, rationale) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (run_id, body.gate, body.decision, body.decided_by, body.rationale),
+    )
+    conn.commit()
+
+    if body.decision == "rejected":
+        target = REJECT_TARGET
+    elif body.gate == "ARCH_APPROVAL":
+        target = "SECURITY_APPROVAL" if run["security_sensitive"] else "IMPLEMENT"
+    else:  # SECURITY_APPROVAL approved
+        target = "IMPLEMENT"
+
+    try:
+        transition(conn, run_id, to_state=target, actor="human", reason=body.rationale)
     except InvalidTransitionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 

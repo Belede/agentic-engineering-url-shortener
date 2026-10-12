@@ -34,7 +34,7 @@ def create_run(
 def get_run(conn: sqlite3.Connection, run_id: str) -> dict:
     row = conn.execute(
         "SELECT run_id, requirement_input, scenario_type, current_state, "
-        "policy_pack_version, terminal_status, created_at, updated_at "
+        "policy_pack_version, terminal_status, security_sensitive, created_at, updated_at "
         "FROM workflow_runs WHERE run_id = ?",
         (run_id,),
     ).fetchone()
