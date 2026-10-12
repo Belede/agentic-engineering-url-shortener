@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-12
 
-**Status**: Draft — pending Human Gate 2 approval
+**Status**: Clarified — pending Human Gate 2 (requirements) sign-off alongside this clarification record
 
 **Input**: Interview Assignment "Build an Agentic Software Engineering System — URL Shortener" (see `docs/assessment/assignment.md`), executed under the project constitution (`.specify/memory/constitution.md`) via the controlled SpecKit + Claude Code guidance in `docs/governance/ai-native-sdlc-guide.md`.
 
@@ -160,19 +160,37 @@ As an assessment reviewer, I clone the repository and, using only the README and
 
 A well-defined greenfield requirement proceeds through: Requirement → Decomposition → Design → Implementation → Testing → Documentation → Validation → Release Readiness, **without** an artificial clarification gate when the requirement is complete, consistent, testable, and within approved policy/architecture boundaries. The run records the requirement-quality checks performed and the reason clarification was skipped. If material ambiguity emerges later, only the affected path is suspended for governed clarification and impact analysis, then resumed.
 
-**Candidate requirement for this scenario** (confirmed at Human Gate 2 / Clarify): a new, additive API capability for the existing shortener that is unambiguous on its face. The exact capability is finalized during `/speckit-clarify` together with the human candidate, consistent with the constitution's prohibition on the AI silently choosing material scope — see `OPEN-Q-GF` below.
+**Confirmed requirement (CL-01)**: add `POST /api/v1/links/batch`, accepting 1–25 items and returning per-item results. Complete, consistent, testable, and within approved architecture boundaries — proceeds without an artificial clarification gate; see `docs/scenarios/greenfield.md` for the full run record once implemented.
 
 ### Scenario B: Brownfield
 
 An enhancement, refactor, or defect correction against the already-implemented URL shortener. Before any code changes, the system identifies impacted components, interfaces, data flows, tests, documentation, regression risk, and rollout/rollback considerations (see User Story 3).
 
-**Candidate requirement for this scenario**: finalized during `/speckit-clarify` — see `OPEN-Q-BF` below.
+**Confirmed requirement (CL-02)**: add an optional `max_clicks` limit to an existing link; once exhausted, redirects return `410 LINK_EXHAUSTED`. Requires a reversible schema migration and an atomic, concurrency-safe click-count check — see `docs/scenarios/brownfield.md` once implemented.
 
 ### Scenario C: Ambiguous Requirement
 
 Incomplete, unclear, or conflicting input is detected, implementation is prevented, human clarification is requested and recorded, downstream impact is identified, affected artifacts are updated, and the workflow resumes at the correct state (see User Story 4).
 
-**Candidate requirement for this scenario**: finalized during `/speckit-clarify` — see `OPEN-Q-AMB` below.
+**Confirmed requirement (CL-03)**: feed the orchestration the text "Links should expire automatically after a while, but links that have already been shared must never break." — containing both a vague temporal term and a direct contradiction, to prove detection rather than silent interpretation. See `docs/scenarios/ambiguous.md` once implemented.
+
+## Clarifications (Human Gate 3 — resolved 2026-10-12)
+
+Each decision below was made explicitly by the human candidate (Belede Rahul), not inferred or auto-selected by the AI assistant, per constitution Principle III and the guide's Human Gate 3 rule against "best practices" placeholders.
+
+| ID | Question | Decision | Engineering Impact |
+|----|----------|----------|---------------------|
+| CL-01 | OPEN-Q-GF — Greenfield capability | **Batch link creation**: `POST /api/v1/links/batch` creates 1–25 links per call, returning per-item results. | Purely additive, no breaking change, no migration (contract 1.0.0 → 1.1.0). Whole batch charged against the caller's rate limit up front — a `429` creates nothing. No batch-level idempotency (documented limitation; per-item `Idempotency-Key` still applies if supplied per item). |
+| CL-02 | OPEN-Q-BF — Brownfield change | **Optional `max_clicks` limit** on an existing link; once reached, further redirects return `410 LINK_EXHAUSTED`. | Requires a nullable-column migration (reversible down script), an atomic conditional UPDATE so concurrent redirects never exceed the limit, and a new terminal redirect outcome. Real impact analysis required before implementation (modules, routes, schema, tests). |
+| CL-03 | OPEN-Q-AMB — Ambiguous requirement text | **"Links should expire automatically after a while, but links that have already been shared must never break."** | Contains both a vague, non-testable temporal term ("after a while") and a direct contradiction (expire vs. never break) for already-issued links. Orchestration must detect both defects and halt at `CLARIFY` rather than guessing an interpretation. |
+| CL-04 | OPEN-Q-IDEMP — Idempotency strategy | **Client-supplied `Idempotency-Key` header.** An identical key from the same caller within a bounded retention window returns the original result instead of creating a duplicate link. | Explicit, industry-standard semantics (FR-007 updated below). Requires a persisted idempotency-key → result mapping with a documented retention window. |
+| CL-05 | OPEN-Q-SECURITY — SSRF-style abuse | **Block link creation when the target resolves to localhost, loopback, or an RFC1918/RFC4193 private address.** | NFR-001 updated below to a concrete, testable control rather than a proposed assumption. Requires DNS/IP resolution at creation time, not just string-pattern matching. |
+| CL-06 | OPEN-Q-AUTH — Authentication assumption | **No login/session system.** Requests carry a static per-caller `X-API-Key` header, used only to scope idempotency and rate limiting — explicitly documented as a prototype assumption, not a production auth system. | Enables per-caller rate limiting and idempotency scoping (CL-04, CL-08) without building real authentication, consistent with the 2–3 day timebox and the Exclusions section. |
+| CL-07 | OPEN-Q-EXPIRY — Default expiration | **No default expiry.** Links are permanent unless the caller supplies `expires_at` or `ttl_seconds` at creation. | Confirms FR behavior for the baseline (non-ambiguous) path; distinct from the deliberately contradictory CL-03 text used only inside the ambiguous-scenario demonstration. |
+| CL-08 | OPEN-Q-RATE — Rate limiting scope | **In scope.** Fixed limit of 60 create-requests/minute per `X-API-Key`, enforced in-process (no external rate-limit service). | New functional requirement (FR-028 below). Batch creation (CL-01) counts as a single request against this limit regardless of item count. |
+| CL-09 | OPEN-Q-PERF — Performance target | **Approved as a non-binding demonstration target**: p95 redirect-resolution latency < 100ms on local prototype hardware, measured by the test suite. | NFR-007 retained, explicitly labeled a demonstration measurement, not a production SLA (constitution Principle IX). |
+
+All nine clarification items from the Draft specification are now resolved; no unresolved `OPEN-Q-*` markers remain.
 
 ## Requirements *(mandatory)*
 
@@ -184,7 +202,7 @@ Incomplete, unclear, or conflicting input is detected, implementation is prevent
 - **FR-004**: System MUST resolve a valid, non-expired short code to an HTTP redirect to the stored target URL.
 - **FR-005**: System MUST reject resolution of an expired short code with a distinguishable error outcome (not a generic 404).
 - **FR-006**: System MUST capture a redirect analytics event (at minimum: timestamp, short code) for every successful resolution.
-- **FR-007**: System MUST define and apply idempotency behavior for duplicate/retried create requests [NEEDS CLARIFICATION: is idempotency based on a client-supplied key, or on exact URL+caller match? See `OPEN-Q-IDEMP`].
+- **FR-007**: System MUST accept an optional client-supplied `Idempotency-Key` header on create requests; a repeated key from the same caller within the documented retention window MUST return the original result rather than creating a duplicate record (CL-04).
 - **FR-008**: System MUST remain correct under concurrent requests to the same short code (no double-counted analytics from a single redirect, no lost updates).
 - **FR-009**: System MUST handle short-code generation collisions deterministically (detect and regenerate, or reserve ranges) without unbounded retry.
 - **FR-010**: System MUST fail safely (no partial writes, clear error class) when the persistence layer is unavailable.
@@ -208,6 +226,9 @@ Incomplete, unclear, or conflicting input is detected, implementation is prevent
 - **FR-025**: Orchestration MUST record audit-grade evidence (actor type, action, timestamp, affected artifact/state, result, reason) for every state transition, approval, retry, rollback, and replanning event.
 - **FR-026**: Orchestration MUST compute and expose reliability metrics (success rate, retry frequency, rollback/compensation frequency, MTTR, end-to-end latency) from actual recorded run data, clearly labeled as demonstration measurements.
 - **FR-027**: Orchestration MUST evaluate versioned compliance/change-control policy checks on every run and record PASS/FAIL/EXCEPTION-REQUESTED/NOT-APPLICABLE per applicable policy, blocking progression on an unresolved mandatory FAIL.
+- **FR-028**: System MUST enforce a fixed rate limit of 60 create-requests per minute per `X-API-Key`, counting a batch create (FR-029) as a single request regardless of item count, and MUST reject requests over the limit with a structured `429` error (CL-08).
+- **FR-029**: System MUST support batch link creation (1–25 items per call) returning per-item results; the entire batch MUST be charged against the caller's rate limit up front, so a `429` on the batch creates zero links (CL-01).
+- **FR-030**: System MUST support an optional `max_clicks` limit on a link; once the limit is reached, further redirect attempts MUST return `410 LINK_EXHAUSTED` via an atomic, concurrency-safe check (CL-02).
 
 ### Key Entities
 
@@ -221,13 +242,13 @@ Incomplete, unclear, or conflicting input is detected, implementation is prevent
 
 ## Non-Functional Requirements
 
-- **NFR-001 (Security)**: Only `http`/`https` schemes are accepted for target URLs; no execution of attacker-supplied redirect targets beyond standard HTTP redirect semantics. [Proposed validation target, requires approval: reject `javascript:`, `data:`, `file:` schemes outright — see `OPEN-Q-SECURITY`.]
+- **NFR-001 (Security)**: Only `http`/`https` schemes are accepted for target URLs (`javascript:`, `data:`, `file:`, and all other schemes are rejected at creation). Additionally, link creation MUST be rejected when the target resolves to localhost, loopback, or an RFC1918/RFC4193 private address, to prevent SSRF-style redirect abuse (CL-05).
 - **NFR-002 (Reliability)**: Bounded retry with a documented maximum attempt count and backoff strategy for transient persistence failures. [Proposed target: max 3 attempts — requires approval.]
 - **NFR-003 (Scalability)**: The prototype MUST demonstrate correctness under concurrent load in its own test suite; production-scale load testing is explicitly out of scope and MUST be labeled as such.
 - **NFR-004 (Maintainability)**: Domain logic, API delivery, persistence, orchestration, and policy enforcement MUST be in separately testable modules (constitution Principle VII).
 - **NFR-005 (Observability)**: Every orchestration run MUST be traceable end-to-end via its correlation id across logs and persisted state.
 - **NFR-006 (Auditability)**: Audit evidence MUST be queryable per run and MUST NOT be mutable after being written (append-only).
-- **NFR-007 (Performance)**: [Proposed validation target, requires approval: p95 redirect resolution latency under 100ms on local prototype hardware, measured by the test suite — see `OPEN-Q-PERF`. Not a confirmed client requirement; the assignment specifies no numeric target.]
+- **NFR-007 (Performance)**: p95 redirect-resolution latency under 100ms on local prototype hardware, measured by the test suite. Approved as a non-binding demonstration target (CL-09); the assignment specifies no numeric target, so this MUST be labeled a demonstration measurement, not a production SLA.
 - **NFR-008 (Recoverability)**: A workflow run interrupted at any persisted state MUST be resumable with zero loss of prior decision lineage.
 - **NFR-009 (Testability)**: Every orchestration state transition MUST be independently unit-testable without requiring a full end-to-end run.
 - **NFR-010 (Change Safety)**: A brownfield change MUST NOT be implemented without a preceding, committed impact analysis.
@@ -245,18 +266,13 @@ Incomplete, unclear, or conflicting input is detected, implementation is prevent
 - **Stack**: Python + FastAPI + SQLite, proposed for formal ADR acceptance at the ADR gate (human-confirmed direction, 2026-10-12).
 - **Agent execution mode**: Deterministic rule-based orchestration logic by default, with an optional, clearly labeled real-LLM plug-in point (human-confirmed direction, 2026-10-12).
 - **Repository**: `Belede/agentic-engineering-url-shortener` on GitHub, private (human-confirmed, 2026-10-12).
+- **Authentication**: no login/session system; static per-caller `X-API-Key` header for rate-limit and idempotency attribution only (CL-06).
+- **Default expiry**: links are permanent unless the caller sets `expires_at`/`ttl_seconds` (CL-07).
+- **Rate limiting**: 60 create-requests/minute per `X-API-Key`, in-process (CL-08).
 
-## Open Questions for `/speckit-clarify` (Human Gate 3)
+## Resolved Clarifications
 
-- **OPEN-Q-GF**: What is the exact greenfield capability to add (FR-### scope) for Scenario A?
-- **OPEN-Q-BF**: What is the exact brownfield change to make against the already-implemented shortener for Scenario B?
-- **OPEN-Q-AMB**: What is the exact ambiguous requirement text to feed Scenario C (must contain a genuine, detectable defect)?
-- **OPEN-Q-IDEMP**: Idempotency key strategy for FR-007 — client-supplied `Idempotency-Key` header vs. exact-match URL+caller dedup?
-- **OPEN-Q-SECURITY**: Confirm the exact disallowed URL schemes and any additional abuse controls (e.g., blocking localhost/internal IP targets — SSRF-style redirect abuse) for NFR-001.
-- **OPEN-Q-PERF**: Confirm or reject the proposed NFR-007 latency target, or mark as non-binding demonstration-only.
-- **OPEN-Q-AUTH**: What authentication assumption should the API consumer role operate under (none / static API key / none-with-rate-limit-by-IP)?
-- **OPEN-Q-RATE**: Confirm whether rate limiting is in scope for this timeboxed prototype, and if so, what the limit should be.
-- **OPEN-Q-EXPIRY**: Confirm default expiration behavior for newly created links (no default expiry vs. a default TTL).
+All clarification items raised during drafting are resolved in the **Clarifications** table above (CL-01 through CL-09). No unresolved `OPEN-Q-*` markers remain in this specification.
 
 ## Success Criteria *(mandatory)*
 
