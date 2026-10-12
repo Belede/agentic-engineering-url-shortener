@@ -84,6 +84,77 @@ def create_link(
     return _to_response(link)
 
 
+class BatchItem(BaseModel):
+    target_url: str
+    expires_at: str | None = None
+    ttl_seconds: int | None = Field(default=None, gt=0)
+
+
+class CreateBatchRequest(BaseModel):
+    items: list[BatchItem]
+
+
+class BatchItemResult(BaseModel):
+    status: str  # "created" | "error"
+    target_url: str
+    code: str | None = None
+    short_url: str | None = None
+    expires_at: str | None = None
+    error: str | None = None
+    message: str | None = None
+
+
+class BatchResponse(BaseModel):
+    results: list[BatchItemResult]
+
+
+@router.post("/api/v1/links/batch", response_model=BatchResponse)
+def create_batch(
+    body: CreateBatchRequest,
+    api_key: str = Depends(enforce_rate_limit),
+    conn: sqlite3.Connection = Depends(get_db),
+) -> BatchResponse:
+    """CL-01, FR-029: 1-25 items per call, per-item results, HTTP 200 even
+    on partial failure. The whole batch is charged against the caller's
+    rate limit up front (via enforce_rate_limit) — a 429 here creates
+    nothing, since this handler body never runs. No batch-level idempotency
+    (documented limitation; contract 1.0.0 -> 1.1.0, additive)."""
+    if not (1 <= len(body.items) <= 25):
+        raise HTTPException(status_code=400, detail="items must contain between 1 and 25 entries")
+
+    results: list[BatchItemResult] = []
+    for item in body.items:
+        try:
+            validate_target_url(item.target_url)
+        except (InvalidUrlError, SsrfBlockedError) as exc:
+            results.append(BatchItemResult(
+                status="error", target_url=item.target_url, error="INVALID_URL", message=str(exc)
+            ))
+            continue
+
+        expires_at = _resolve_expires_at(
+            CreateLinkRequest(target_url=item.target_url, expires_at=item.expires_at, ttl_seconds=item.ttl_seconds)
+        )
+        try:
+            code = generate_unique_code(exists=lambda c: links_repository.code_exists(conn, c))
+            link = links_repository.create_link(
+                conn, code=code, target_url=item.target_url, created_by=api_key, expires_at=expires_at,
+            )
+        except CodeSpaceExhaustedError:
+            results.append(BatchItemResult(
+                status="error", target_url=item.target_url, error="CODE_SPACE_EXHAUSTED",
+                message="Could not generate a unique code",
+            ))
+            continue
+
+        results.append(BatchItemResult(
+            status="created", target_url=link.target_url, code=link.code,
+            short_url=f"https://short.local/{link.code}", expires_at=link.expires_at,
+        ))
+
+    return BatchResponse(results=results)
+
+
 def _to_response(link: links_repository.ShortLink) -> LinkResponse:
     return LinkResponse(
         code=link.code,
