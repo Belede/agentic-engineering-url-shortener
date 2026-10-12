@@ -92,7 +92,7 @@ Test: `tests/orchestration/test_arch_approval_gate.py`.
 
 ## 17. Requirement Traceability
 
-`docs/traceability/matrix.md` — every FR-/NFR- mapped to scenario/ADR/task/code/test, with an explicit Orphan Check.
+`docs/traceability/matrix.md` — every FR-/NFR- mapped to scenario/ADR/task/code/test, with an explicit Orphan Check. See also `docs/assessment/three-scenario-evidence-review.md` for the dedicated cross-scenario readiness matrix, and `specs/001-agentic-url-shortener/checklists/quality-checklist.md` for the fully checked-off post-implementation checklist (65/65 ☑).
 
 ## 18. Audit Evidence
 
