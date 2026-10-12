@@ -31,3 +31,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 src = ["src", "tests"]
+
+[tool.ruff.lint]
+# B008: Depends()/Header() in argument defaults is FastAPI's standard DI pattern, not a bug.
+ignore = ["B008"]

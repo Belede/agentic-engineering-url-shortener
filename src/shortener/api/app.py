@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from shortener.api.health import router as health_router
+from shortener.api.links import router as links_router
 
 MIGRATIONS_DIR = Path(__file__).parents[1] / "migrations"
 
@@ -21,7 +22,10 @@ def create_app(db_path: str | None = None) -> FastAPI:
     app.state.db_path = resolved_db_path
     app.state.migrations_dir = MIGRATIONS_DIR
 
+    app.state.rate_limit_per_minute = settings.rate_limit_per_minute
+
     app.include_router(health_router)
+    app.include_router(links_router)
 
     return app
 
