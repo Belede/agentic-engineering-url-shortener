@@ -1,0 +1,120 @@
+openapi: 3.0.3
+info:
+  title: Agentic URL Shortener API
+  version: 1.0.0
+  description: >
+    Baseline contract (pre-Greenfield-scenario). Batch creation (CL-01) is added
+    at version 1.1.0 by the Greenfield scenario under governed orchestration.
+    See specs/001-agentic-url-shortener/data-model.md for schema details.
+servers:
+  - url: http://localhost:8000
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    CreateLinkRequest:
+      type: object
+      required: [target_url]
+      properties:
+        target_url:
+          type: string
+          format: uri
+          description: http/https only; private/loopback targets rejected (CL-05)
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+        ttl_seconds:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: mutually exclusive with expires_at
+    LinkResponse:
+      type: object
+      properties:
+        code: { type: string }
+        short_url: { type: string, format: uri }
+        target_url: { type: string, format: uri }
+        expires_at: { type: string, format: date-time, nullable: true }
+    ErrorResponse:
+      type: object
+      properties:
+        error: { type: string }
+        message: { type: string }
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string }
+paths:
+  /healthz:
+    get:
+      summary: Process liveness
+      security: []
+      responses:
+        "200": { description: process is up }
+  /readyz:
+    get:
+      summary: Dependency readiness (DB reachable)
+      security: []
+      responses:
+        "200": { description: ready }
+        "503": { description: dependency unavailable }
+  /api/v1/links:
+    post:
+      summary: Create a short link (FR-001)
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateLinkRequest" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LinkResponse" }
+        "400":
+          description: invalid URL / scheme / SSRF-blocked target (FR-002, CL-05)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "429":
+          description: rate limit exceeded (FR-028)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "503":
+          description: persistence unavailable (FR-010)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+  /{code}:
+    get:
+      summary: Resolve a short code and redirect (FR-004)
+      security: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "302": { description: redirect to target_url }
+        "404":
+          description: unknown code
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "410":
+          description: expired link (FR-005)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
